@@ -1,0 +1,60 @@
+name: Mark PR as Ready for Review
+
+on:
+  workflow_run:
+    workflows:
+      - "Check ADR Existence"
+      - "Validate Control Yaml exist"
+      - "Validate Policy-Architecture Compliance"
+    types:
+      - completed
+
+jobs:
+  mark-ready:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get PR number and commit SHA
+        id: get_info
+        run: |
+          echo "PR_NUMBER=$(jq '.[0].number' <<< '${{ toJson(github.event.workflow_run.pull_requests) }}')" >> $GITHUB_ENV
+          echo "COMMIT_SHA=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_ENV
+
+      - name: Check status of all workflows
+        id: check_statuses
+        run: |
+          echo "Checking workflow run statuses for commit $COMMIT_SHA"
+
+          STATUS_ADR=$(gh run list --json name,status,conclusion,headSha -L 10 \
+            --workflow="Check ADR Existence" | jq -r '.[] | select(.headSha == env.COMMIT_SHA) | .conclusion')
+
+          STATUS_YAML=$(gh run list --json name,status,conclusion,headSha -L 10 \
+            --workflow="Validate Control Yaml exist" | jq -r '.[] | select(.headSha == env.COMMIT_SHA) | .conclusion')
+
+          STATUS_POLICY=$(gh run list --json name,status,conclusion,headSha -L 10 \
+            --workflow="Validate Policy-Architecture Compliance" | jq -r '.[] | select(.headSha == env.COMMIT_SHA) | .conclusion')
+
+          echo "ADR: $STATUS_ADR"
+          echo "YAML: $STATUS_YAML"
+          echo "POLICY: $STATUS_POLICY"
+
+          if [[ "$STATUS_ADR" == "success" && "$STATUS_YAML" == "success" && "$STATUS_POLICY" == "success" ]]; then
+            echo "ALL_PASSED=true" >> $GITHUB_ENV
+          else
+            echo "Not all workflows passed. Skipping PR update."
+            echo "ALL_PASSED=false" >> $GITHUB_ENV
+          fi
+        env:
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+        shell: bash
+
+      - name: Mark PR as Ready for Review
+        if: env.ALL_PASSED == 'true'
+        run: |
+          echo "Marking PR #${PR_NUMBER} as ready for review"
+          curl -s -X PATCH \
+            -H "Authorization: token ${{ secrets.PAT_REPO_WRITE }}" \
+            -H "Accept: application/vnd.github.shadow-cat-preview+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }} \
+            -d '{"draft": false}'
