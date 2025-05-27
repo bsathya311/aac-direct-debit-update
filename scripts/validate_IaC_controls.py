@@ -23,7 +23,11 @@ OPENAI_API_VERSION = "2023-09-01-preview"
 OPENAI_API_TYPE = "azure"
 
 # Hardcoded output directory for the report
-REPORT_OUTPUT_DIRECTORY = r"C:\Users\TAMANNAJANGID\Desktop\Natwest POC\Task-4\report2" # Ensure this path is correct
+#REPORT_OUTPUT_DIRECTORY = r"C:\Users\TAMANNAJANGID\Desktop\Natwest POC\Task-4\report2" # Ensure this path is correct
+
+# updated
+REPORT_OUTPUT_DIRECTORY = os.path.join("aac-direct-debit-update", "compliance-reports")
+TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 def clone_repo(repo_url, target_dir=None):
     """Clone a GitHub repository to a specified directory or a temporary directory"""
@@ -445,7 +449,7 @@ def generate_report(mapping_results: List[Dict[str, Any]],
     if not os.path.exists(REPORT_OUTPUT_DIRECTORY):
         os.makedirs(REPORT_OUTPUT_DIRECTORY)
     
-    report_filename = f"{repo_name}_control_analysis.md"
+    report_filename = f"IaC_control_analysis{TIMESTAMP}.md"
     report_path = os.path.join(REPORT_OUTPUT_DIRECTORY, report_filename)
 
     with open(report_path, "w", encoding="utf-8") as f:
